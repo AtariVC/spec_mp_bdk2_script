@@ -5,7 +5,7 @@ import yaml
 from pathlib import Path
 from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QFileDialog, QLabel, QMessageBox
 from backend import load_data, prepare_data, merge_data, create_result_table, \
-add_section_names, save_to_excel, filter_unwanted_sections, create_grouped_book
+add_section_names, save_to_excel, filter_unwanted_sections, MK_creator
 
 class FileSelectionWindow(QWidget):
     def __init__(self):
@@ -102,15 +102,15 @@ class FileSelectionWindow(QWidget):
 
         # Путь для сохранения выходного файла
         self.output_path = Path(self.spec_file).parent/"merged_output_MP.xlsx"
-        grouped_book_path = Path(self.spec_file).parent/"grouped_book_MK.xlsx"
-        # create_grouped_book(final_data, grouped_book_path)
+        MK_creator_path = Path(self.spec_file).parent/"grouped_book_MK.xlsx"
+        MK_creator(self.spec_file, MK_creator_path)
         save_to_excel(final_data, self.output_path)
         # Отображаем путь к сохраненному файлу
         self.spec_label.setText(f"Файл сохранен: {self.output_path}")
 
         # Открытие выходного файла
-        self.open_file(self.output_path)
-        self.open_file(grouped_book_path)
+        # self.open_file(self.output_path)
+        self.open_file(MK_creator_path)
 
 
     def open_file(self, file_path):

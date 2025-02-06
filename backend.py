@@ -1,6 +1,8 @@
 import pandas as pd
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.merge import MergeCells
 
 import os
 import time
@@ -169,44 +171,133 @@ def save_to_excel(final_data, output_path):
     # Сохранение файла
     wb.save(output_path)
 
+# def MK_creator(input_path, output_path):
+#     xls = pd.ExcelFile(input_path)
+#     wb = Workbook()
+#     wb.remove(wb.active)  # Удаляем стандартный лист
+    
+#     sheet_counter = 1
+#     row_limit = 18
+#     current_row = 1
+#     ws = None
+    
+#     for sheet_name in xls.sheet_names:
+#         df = pd.read_excel(xls, sheet_name=sheet_name)
+        
+#         current_section = None
+#         component_name = ""
+#         quantity = None
+        
+#         for index, row in df.iterrows():
+#             first_col = row.iloc[0] if len(row) > 0 else None  # Первая колонка (номер или пустая)
+#             section = row.iloc[2] if len(row) > 2 else ""  # Название компонента или раздела
+#             qty = row.iloc[3] if len(row) > 3 else None  # Количество
+            
+#             if ws is None:
+#                 ws = wb.create_sheet(title=f"Лист{sheet_counter}")
+#                 sheet_counter += 1
+#                 current_row = 1
+            
+#             if pd.isna(first_col) and pd.isna(qty):  # Это раздел (название группы компонентов)
+#                 if component_name:  # Добавляем предыдущий компонент в таблицу
+#                     ws.append(["", component_name, f"{int(quantity)} шт."])
+#                     current_row += 1
+#                     component_name = ""
+                
+#                 current_section = " ".join(str(section).split())  # Убираем перенос строк
+                
+#                 if current_row > row_limit:
+#                     ws = wb.create_sheet(title=f"Лист{sheet_counter}")
+#                     sheet_counter += 1
+#                     current_row = 1
+                
+#                 ws.append([current_section, "", ""])
+#                 ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=2)
+#                 ws[current_row][0].font = Font(italic=True)
+#                 ws[current_row][0].alignment = Alignment(horizontal="left")
+#                 current_row += 1
+#             else:  # Это компонент
+#                 if not pd.isna(first_col):  # Начало нового компонента
+#                     if component_name:  # Записываем предыдущий компонент
+#                         ws.append(["", component_name, f"{int(quantity)} шт."])
+#                         current_row += 1
+#                     component_name = " ".join(str(section).split())  # Убираем перенос строк
+#                     quantity = qty
+#                 else:  # Продолжение названия компонента
+#                     component_name += " " + " ".join(str(section).split())
+        
+#         if component_name:  # Добавляем последний компонент
+#             ws.append(["", component_name, f"{int(quantity)} шт."])
+#             current_row += 1
+    
+#     # Настройка ширины колонок
+#     for sheet in wb.worksheets:
+#         for col_num in range(1, 4):
+#             col_letter = get_column_letter(col_num)
+#             sheet.column_dimensions[col_letter].width = 30
+    
+#     wb.save(output_path)
 
-
-def create_grouped_book(final_data, output_grouped_path):
-    """Создает книгу с компонентами, сгруппированными по категориям из результирующей таблицы."""
-    component_groups = [
-    "Конденсаторы", "Микросхемы", "Катушки индуктивности", "Резисторы", "Печатная плата",
-    "Транзисторы", "Диоды", "Соединения контактные"
-]
-    italic_groups = {"Соединения контактные"}  # Группы, которые должны быть курсивом
-
+def MK_creator(input_path, output_path):
+    # Загружаем исходный файл
+    xls = pd.ExcelFile(input_path)
+    sheet_name = xls.sheet_names[0]  # Используем первый лист
+    df = pd.read_excel(xls, sheet_name=sheet_name)
+    unwanted_sections = ["Документация", "Сборочный чертеж", "Сборочные единицы", "Плата печатная", "Прочие изделия"]
+    
+    # Создаем новый Excel-файл
     wb = Workbook()
     ws = wb.active
-    ws.title = "Группы компонентов"
+    ws.title = "Лист1"
     
-    grouped_data = {}
-    for row in final_data:
-        name = row[2]
-        count = row[3] if row[3] else "1"
+    
+    # Устанавливаем стили заголовков
+    for col in range(1, 4):
+        cell = ws.cell(row=1, column=col)
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal="center")
+    
+    current_section = None
+    row_index = 2
+    page_count = 0
+    for sheet_name in xls.sheet_names:
+        df = pd.read_excel(xls, sheet_name=sheet_name)
         
-        for group in component_groups:
-            if group.lower() in name.lower():
-                if group not in grouped_data:
-                    grouped_data[group] = []
-                grouped_data[group].append((name, f"{count} шт."))
-                break
+        for i in range(len(df)):
+            name = str(df.iloc[i]["Наименование"]).strip()
+            quantity = df.iloc[i]["Кол."]
+            if "nan" not in name and pd.isna(quantity) and name not in unwanted_sections:  # Раздел
+                current_section = name
+            # if "nan" not in name and pd.isna(quantity):  # Раздел
+                # current_section = name
+                ws.append([current_section, "", ""])
+                ws.merge_cells(start_row=row_index, start_column=1, end_row=row_index, end_column=2)
+                ws[row_index][0].font = Font(italic=True, bold=False)
+                row_index += 1
+            elif "nan" not in name and not pd.isna(quantity):  # Компонент
+                if row_index > 18:  # Разбивка на страницы
+                    ws = wb.create_sheet(title=f"Страница {page_count+1}")
+                    row_index = 1
+                    page_count += 1
+                ws.append(["", name, f"{int(quantity)} шт."])
+                row_index += 1
+
+    # Автоширина колонок
+    for col in range(1, 4):
+        max_length = max(len(str(ws.cell(row=row, column=col).value)) for row in range(1, ws.max_row + 1))
+        ws.column_dimensions[get_column_letter(col)].width = max_length + 2
     
-    for group, items in grouped_data.items():
-        ws.append([group, "", ""])  # Заголовок группы
-        last_row = ws.max_row
-        for cell in ws[last_row]:
-            if group in italic_groups:
-                cell.font = Font(italic=True)
-        
-        for name, count in items:
-            ws.append(["", name, count])
-    
-    wb.save(output_grouped_path)
-    print(f"Группированный файл сохранен: {output_grouped_path}")
+    # Сохранение файла
+    wb.save(output_path)
+    print(f"Файл сохранен: {output_path}")
+
+
+
+# def create_grouped_book(final_data, output_grouped_path):
+    # """Создает книгу с компонентами, сгруппированными по категориям из результирующей таблицы."""
+    # component_groups = [
+    # "Конденсаторы", "Микросхемы", "Катушки индуктивности", "Резисторы", "Печатная плата",
+    # "Транзисторы", "Диоды", "Соединения контактные"
 
 
 def main():
@@ -222,7 +313,7 @@ def main():
     save_to_excel(final_data, output_path)
     
     # Создание книги с группировкой
-    create_grouped_book(final_data)
+    # create_grouped_book(final_data)
 
 
     # === Обработка ошибки PermissionError ===
