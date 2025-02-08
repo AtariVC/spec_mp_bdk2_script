@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "poetry new spec-mp-bdk2-script"
+version = "0.1.0"
+description = "Скрипт для автоматического формирования маршрутных карт из спецификации"
+authors = ["Vladislav Komarov <67183850+AtariVC@users.noreply.github.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pandas = "^2.2.3"
+openpyxl = "^3.1.5"
+pyqt6 = "^6.8.0"
+pyyaml = "^6.0.2"
+xlrd = "^2.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
