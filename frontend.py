@@ -1,11 +1,12 @@
 import sys
 import os
 import subprocess
+import copy
 import yaml
 from pathlib import Path
 from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QFileDialog, QLabel, QMessageBox
 from backend import load_data, prepare_data, merge_data, create_result_table, \
-add_section_names, save_to_excel, filter_unwanted_sections, MK_creator
+add_section_names, save_to_excel, filter_unwanted_sections, MK_creator, filter_unwanted_sections_MK
 
 class FileSelectionWindow(QWidget):
     def __init__(self):
@@ -35,7 +36,7 @@ class FileSelectionWindow(QWidget):
         # Чтение данных из YAML-файла
         with open(settings_path, "r", encoding="utf-8") as file:
             loaded_config_data = yaml.safe_load(file)
-        
+
         self.spec_path = loaded_config_data.get("spec_path", "")
         self.ekb_path = loaded_config_data.get("ekb_path", "")
         file.close()
@@ -73,7 +74,7 @@ class FileSelectionWindow(QWidget):
         """Выбор файла спецификации."""
         file_dialog = QFileDialog(self)
         self.spec_file, _ = file_dialog.getOpenFileName(self, "Выберите файл спецификации", str(Path().joinpath(self.spec_path)), "Excel Files (*.xlsx)")
-        if self.spec_file: 
+        if self.spec_file:
             self.spec_label.setText(f"Спецификация: {self.spec_file}")
 
     def select_ekb_file(self):
@@ -95,6 +96,8 @@ class FileSelectionWindow(QWidget):
 
         specification, passports = load_data(self.spec_file, self.ekb_file)
         specification, passports = prepare_data(specification, passports)
+        specification_MK = copy.deepcopy(specification)
+        specification_MK = filter_unwanted_sections_MK(specification_MK)
         specification = filter_unwanted_sections(specification)
         merged_data = merge_data(specification, passports)
         result = create_result_table(merged_data)
@@ -103,14 +106,14 @@ class FileSelectionWindow(QWidget):
         # Путь для сохранения выходного файла
         self.output_path = Path(self.spec_file).parent/"merged_output_MP.xlsx"
         MK_creator_path = Path(self.spec_file).parent/"grouped_book_MK.xlsx"
-        # MK_creator(self.spec_file, MK_creator_path)
         save_to_excel(final_data, self.output_path)
+        MK_creator(self.spec_file, specification_MK, MK_creator_path, specification)
         # Отображаем путь к сохраненному файлу
         self.spec_label.setText(f"Файл сохранен: {self.output_path}")
 
         # Открытие выходного файла
         self.open_file(self.output_path)
-        # self.open_file(MK_creator_path)
+        self.open_file(MK_creator_path)
 
 
     def open_file(self, file_path):

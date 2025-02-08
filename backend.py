@@ -1,5 +1,5 @@
 import pandas as pd
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, Alignment
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.merge import MergeCells
@@ -22,15 +22,15 @@ def load_data(spec_file, ekb_file):
 def prepare_data(specification, passports):
     """Очистка и подготовка данных."""
     specification = specification.dropna(subset=['Наименование'])
-    
+
     # Удаляем дубликаты по 'Наименование'
     specification = specification.drop_duplicates(subset=['Наименование'], keep='first')
 
     passports.columns = ['Наименование', 'Паспорт', 'Дата']
-    
+
     # Преобразуем дату в строку (если она не строка)
     passports['Дата'] = passports['Дата'].astype(str)
-    
+
     return specification, passports
 
 
@@ -45,7 +45,7 @@ def extract_year_and_add_25(date_str):
 def merge_data(specification, passports):
     """Объединение данных по наименованию."""
     merged_data = pd.merge(specification, passports, on='Наименование', how='left')
-    
+
     # Преобразуем столбец "Дата" в строку с явным форматом MM.YYYY
     merged_data['Дата'] = merged_data['Дата'].apply(lambda x: str(x) if pd.notna(x) else '').str[:7]
 
@@ -62,28 +62,28 @@ def merge_data(specification, passports):
 def create_result_table(merged_data):
     """Создание результирующей таблицы с пустыми столбцами и нумерацией."""
     result = pd.DataFrame({
-        'A': merged_data['Поз.']-1,  
-        'B': '',  
-        'C': merged_data['Наименование'],  
-        'D': merged_data.get('Кол.', ''),  
-        'E': merged_data.get('Кол.', ''),  
+        'A': merged_data['Поз.']-1,
+        'B': '',
+        'C': merged_data['Наименование'],
+        'D': merged_data.get('Кол.', ''),
+        'E': merged_data.get('Кол.', ''),
         'F': merged_data['Паспорт'],
-        'G': merged_data['Дата'],  
-        'H': merged_data['H'],  
+        'G': merged_data['Дата'],
+        'H': merged_data['H'],
         'I': merged_data['I']
     })
-    # result.insert(0, '№', range(1, len(result) + 1))  
+    # result.insert(0, '№', range(1, len(result) + 1))
     return result
 
 def add_section_names(result, specification):
     """Добавление названий разделов и разбиение длинных наименований."""
     section_names = specification[specification['Наименование'].str.contains('Конденсаторы|Микросхемы|Диоды|Транзисторы', case=False, na=False)]['Наименование']
     final_data = []
-    
+
     for _, row in result.iterrows():
         name = row['C']
         if name in section_names.values:
-            final_data.append(['', '', name, '', '', '', '', '', ''])  
+            final_data.append(['', '', name, '', '', '', '', '', ''])
         else:
             words = name.split()  # Разбиваем на слова
             lines = []
@@ -115,38 +115,38 @@ def save_to_excel(final_data, output_path):
     """Сохранение данных в Excel с обработкой ошибки доступа."""
     wb = Workbook()
     ws = wb.active
-    ws.title = "Лист1"  
+    ws.title = "Лист1"
 
     row_count = 0
     sheet_number = 1
 
     italic_sections = [
-        "Конденсаторы", "Микросхемы", "Катушки", "индуктивности", "Резисторы", 
+        "Конденсаторы", "Микросхемы", "Катушки", "индуктивности", "Резисторы",
         "Печатная плата", "Транзисторы", "Диоды", "Соединения", "контактные"
     ]
 
     for row in final_data:
-        if row_count >= 18:  
+        if row_count >= 18:
             sheet_number += 1
             ws = wb.create_sheet(title=f"Лист{sheet_number}")
-            row_count = 0  
-        
+            row_count = 0
+
         ws.append(row)
         row_count += 1
 
     # Применение стилей ко всем листам
     for sheet in wb.worksheets:
         # Установка формата текста для столбцов G, H, I
-        for col in sheet.iter_cols(min_col=7, max_col=9):  
+        for col in sheet.iter_cols(min_col=7, max_col=9):
             for cell in col:
-                cell.number_format = '@'  
+                cell.number_format = '@'
 
         # Установка ширины столбцов
         column_widths = [63, 276, 255, 80, 80, 265, 82, 99, 99]
         columns = ["A", "B", "C", "D", "E", "F", "G", "H", "I"]
 
         for col, width in zip(columns, column_widths):
-            sheet.column_dimensions[col].width = width / 13.43 
+            sheet.column_dimensions[col].width = width / 13.43
 
         # Курсив для названий разделов
         for row in sheet.iter_rows(min_row=1, max_row=sheet.max_row, min_col=3, max_col=3):
@@ -175,42 +175,42 @@ def save_to_excel(final_data, output_path):
 #     xls = pd.ExcelFile(input_path)
 #     wb = Workbook()
 #     wb.remove(wb.active)  # Удаляем стандартный лист
-    
+
 #     sheet_counter = 1
 #     row_limit = 18
 #     current_row = 1
 #     ws = None
-    
+
 #     for sheet_name in xls.sheet_names:
 #         df = pd.read_excel(xls, sheet_name=sheet_name)
-        
+
 #         current_section = None
 #         component_name = ""
 #         quantity = None
-        
+
 #         for index, row in df.iterrows():
 #             first_col = row.iloc[0] if len(row) > 0 else None  # Первая колонка (номер или пустая)
 #             section = row.iloc[2] if len(row) > 2 else ""  # Название компонента или раздела
 #             qty = row.iloc[3] if len(row) > 3 else None  # Количество
-            
+
 #             if ws is None:
 #                 ws = wb.create_sheet(title=f"Лист{sheet_counter}")
 #                 sheet_counter += 1
 #                 current_row = 1
-            
+
 #             if pd.isna(first_col) and pd.isna(qty):  # Это раздел (название группы компонентов)
 #                 if component_name:  # Добавляем предыдущий компонент в таблицу
 #                     ws.append(["", component_name, f"{int(quantity)} шт."])
 #                     current_row += 1
 #                     component_name = ""
-                
+
 #                 current_section = " ".join(str(section).split())  # Убираем перенос строк
-                
+
 #                 if current_row > row_limit:
 #                     ws = wb.create_sheet(title=f"Лист{sheet_counter}")
 #                     sheet_counter += 1
 #                     current_row = 1
-                
+
 #                 ws.append([current_section, "", ""])
 #                 ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=2)
 #                 ws[current_row][0].font = Font(italic=True)
@@ -225,71 +225,116 @@ def save_to_excel(final_data, output_path):
 #                     quantity = qty
 #                 else:  # Продолжение названия компонента
 #                     component_name += " " + " ".join(str(section).split())
-        
+
 #         if component_name:  # Добавляем последний компонент
 #             ws.append(["", component_name, f"{int(quantity)} шт."])
 #             current_row += 1
-    
+
 #     # Настройка ширины колонок
 #     for sheet in wb.worksheets:
 #         for col_num in range(1, 4):
 #             col_letter = get_column_letter(col_num)
 #             sheet.column_dimensions[col_letter].width = 30
-    
+
 #     wb.save(output_path)
 
-def MK_creator(input_path, output_path):
-    # Загружаем исходный файл
-    xls = pd.ExcelFile(input_path)
-    sheet_name = xls.sheet_names[0]  # Используем первый лист
-    df = pd.read_excel(xls, sheet_name=sheet_name)
-    unwanted_sections = ["Документация", "Сборочный чертеж", "Сборочные единицы", "Плата печатная", "Прочие изделия"]
-    
-    # Создаем новый Excel-файл
+def MK_cut_on_section(result, specification):
+    section_names = specification[specification['Наименование'].str.contains('Конденсаторы|Микросхемы|Диоды|Транзисторы|Резисторы|Сборочные единицы', case=False, na=False)]['Наименование']
+    final_data = []
+
+    for _, row in result.iterrows():
+        name = row['A']
+        if name in section_names.values:
+            final_data.append([name, '', ''])
+        else:
+            words = name.split()  # Разбиваем на слова
+            lines = []
+            current_line = ""
+
+            for word in words:
+                # if len(current_line) + len(word) + 1 <= 18:  # +1 для пробела
+                current_line += (" " if current_line else "") + word
+                # else:
+                    # lines.append(current_line)
+                    # current_line = word
+
+            if current_line:
+                lines.append(current_line)
+
+            # Заполняем строки
+            for i, line in enumerate(lines):
+                if i == 0:
+                    final_data.append([line, '',row['C']])
+                else:
+                    final_data.append([line, "", ""])  # Пустая строка с текстом
+    return final_data
+
+def MK_creator(input_path, res, output_path, specification):
     wb = Workbook()
     ws = wb.active
     ws.title = "Лист1"
-    
-    
-    # Устанавливаем стили заголовков
-    for col in range(1, 4):
-        cell = ws.cell(row=1, column=col)
-        cell.font = Font(bold=True)
-        cell.alignment = Alignment(horizontal="center")
-    
-    current_section = None
-    row_index = 2
-    page_count = 0
-    for sheet_name in xls.sheet_names:
-        df = pd.read_excel(xls, sheet_name=sheet_name)
-        
-        for i in range(len(df)):
-            name = str(df.iloc[i]["Наименование"]).strip()
-            quantity = df.iloc[i]["Кол."]
-            if "nan" not in name and pd.isna(quantity) and name not in unwanted_sections:  # Раздел
-                current_section = name
-            # if "nan" not in name and pd.isna(quantity):  # Раздел
-                # current_section = name
-                ws.append([current_section, "", ""])
-                ws.merge_cells(start_row=row_index, start_column=1, end_row=row_index, end_column=2)
-                ws[row_index][0].font = Font(italic=True, bold=False)
-                row_index += 1
-            elif "nan" not in name and not pd.isna(quantity):  # Компонент
-                if row_index > 18:  # Разбивка на страницы
-                    ws = wb.create_sheet(title=f"Страница {page_count+1}")
-                    row_index = 1
-                    page_count += 1
-                ws.append(["", name, f"{int(quantity)} шт."])
-                row_index += 1
+    row_count = 0
+    sheet_number = 1
 
-    # Автоширина колонок
-    for col in range(1, 4):
-        max_length = max(len(str(ws.cell(row=row, column=col).value)) for row in range(1, ws.max_row + 1))
-        ws.column_dimensions[get_column_letter(col)].width = max_length + 2
-    
+    italic_sections = [
+        "Конденсаторы", "Микросхемы", "Катушки", "индуктивности", "Резисторы",
+        "Печатная плата", "Транзисторы", "Диоды", "Соединения", "контактные", "Сборочные единицы", "Трансформаторы"
+    ]
+    result = pd.DataFrame({
+        'A': res['Наименование'],
+        'B': '',
+        'C': res.get('Кол.', ''),
+    })
+    result['C'] = result['C'].apply(lambda x: str(int(x)) + " шт." if pd.notna(x) else "")
+    final_data = MK_cut_on_section(result, specification)
+    for row in final_data:
+        if row_count >= 13:
+            sheet_number += 1
+            ws = wb.create_sheet(title=f"Лист{sheet_number}")
+            row_count = 0
+
+        ws.append(row)
+        row_count += 1
+
+    # Применение стилей ко всем листам
+    for sheet in wb.worksheets:
+        # Установка формата текста для столбцов G, H, I
+        for col in sheet.iter_cols(min_col=7, max_col=9):
+            for cell in col:
+                cell.number_format = '@'
+
+        # Установка ширины столбцов
+        column_widths = [376, 376, 129]
+        columns = ["A", "B", "C"]
+
+
+
+        # Курсив для названий разделов
+        for row in sheet.iter_rows(min_row=1, max_row=sheet.max_row, min_col=1, max_col=3):
+            for cell in row:
+                if cell.value:
+                    cell.font = Font(size=12)  # Устанавливаем размер шрифта 8
+                if cell.value and any(section in str(cell.value) for section in italic_sections):
+                    cell.font = Font(size=12, italic=True, bold=True)
+
+        # # Установка размера шрифта 8 для столбца G
+        # for row in sheet.iter_rows(min_row=2, max_row=sheet.max_row, min_col=7, max_col=7):  # Столбец G
+        #     for cell in row:
+        #         if cell.value:
+        #             cell.font = Font(size=8)  # Устанавливаем размер шрифта 8
+
+        # Выравнивание по центру для столбцов A, D, E, F, G, H, I
+        # center_alignment = Alignment(horizontal="center", vertical="center")
+        # center_columns = ['A', 'D', 'E', 'F', 'G', 'H', 'I']
+        # for col in center_columns:
+        #     for row in sheet.iter_rows(min_row=1, max_row=sheet.max_row, min_col=columns.index(col) + 1, max_col=columns.index(col) + 1):
+        #         for cell in row:
+        #             cell.alignment = center_alignment
+
     # Сохранение файла
     wb.save(output_path)
-    print(f"Файл сохранен: {output_path}")
+
+
 
 
 
@@ -305,13 +350,13 @@ def main():
     specification, passports = load_data(spec_file, ekb_file)
     specification, passports = prepare_data(specification, passports)
     specification = filter_unwanted_sections(specification)
-    
+
     # Создание основной книги
     merged_data = merge_data(specification, passports)
     result = create_result_table(merged_data)
     final_data = add_section_names(result, specification)
     save_to_excel(final_data, output_path)
-    
+
     # Создание книги с группировкой
     # create_grouped_book(final_data)
 
@@ -322,14 +367,14 @@ def main():
         try:
             wb.save(output_grouped_path)
             print(f"Файл успешно сохранён: {output_grouped_path}")
-            return  
+            return
         except PermissionError:
             print(f"Ошибка: Файл {output_grouped_path} уже открыт. Закройте его и попробуйте снова.")
             time.sleep(3)  # Подождём перед повторной попыткой
             attempt += 1
         except FileNotFoundError:
             print(f"Ошибка: Папка для сохранения не существует! Проверьте путь: {os.path.dirname(output_grouped_path)}")
-            return  
+            return
 
     print("Не удалось сохранить файл. Проверьте права доступа или попробуйте изменить путь.")
 
@@ -337,16 +382,27 @@ def main():
 
 def filter_unwanted_sections(specification):
     """Фильтрация ненужных разделов."""
-    unwanted_sections = ["Документация", "Сборочный чертеж", "Сборочные единицы", "Плата печатная", "Прочие изделия"]
-    
+    unwanted_sections = ["Документация", "Сборочный чертеж", "Сборочные единицы", "Плата печатная", "Прочие изделия", "Джамперы", "Оловянная перемычка"]
+
     # Убираем пробелы и приводим к нижнему регистру для точности сравнения
     specification['Наименование'] = specification['Наименование'].str.strip()
-    
+
     # Применяем фильтрацию
     filtered_specification = specification[~specification['Наименование'].str.contains('|'.join(unwanted_sections), case=False, na=False)]
-    
+
     return filtered_specification
 
+def filter_unwanted_sections_MK(specification):
+    """Фильтрация ненужных разделов."""
+    unwanted_sections = ["Документация", "Сборочный чертеж", "Прочие изделия", "Джамперы", "Оловянная перемычка"]
+
+    # Убираем пробелы и приводим к нижнему регистру для точности сравнения
+    specification['Наименование'] = specification['Наименование'].str.strip()
+
+    # Применяем фильтрацию
+    filtered_specification = specification[~specification['Наименование'].str.contains('|'.join(unwanted_sections), case=False, na=False)]
+
+    return filtered_specification
 
 def main():
     """Основная функция."""
