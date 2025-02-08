@@ -103,14 +103,14 @@ class FileSelectionWindow(QWidget):
         # Путь для сохранения выходного файла
         self.output_path = Path(self.spec_file).parent/"merged_output_MP.xlsx"
         MK_creator_path = Path(self.spec_file).parent/"grouped_book_MK.xlsx"
-        MK_creator(self.spec_file, MK_creator_path)
+        # MK_creator(self.spec_file, MK_creator_path)
         save_to_excel(final_data, self.output_path)
         # Отображаем путь к сохраненному файлу
         self.spec_label.setText(f"Файл сохранен: {self.output_path}")
 
         # Открытие выходного файла
-        # self.open_file(self.output_path)
-        self.open_file(MK_creator_path)
+        self.open_file(self.output_path)
+        # self.open_file(MK_creator_path)
 
 
     def open_file(self, file_path):
