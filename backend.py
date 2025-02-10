@@ -16,8 +16,15 @@ def load_data(spec_file, ekb_file):
     """Загрузка данных из всех листов файла спецификации."""
     all_sheets = pd.read_excel(spec_file, sheet_name=None)  # Загружаем все листы
     specification = pd.concat(all_sheets.values(), ignore_index=True)  # Объединяем в один DataFrame
-    passports = pd.read_excel(ekb_file, sheet_name='Лист1', dtype={'Дата': str})  # Дата как текст
+    passports = pd.read_excel(ekb_file, sheet_name='Лист1', dtype=str, header=None)  # Дата как текст без заголовков
+    passports.columns = ['A', 'B', 'C']  # Задаем имена столбцов вручную
     return specification, passports
+
+def load_specification(spec_file):
+    """Загрузка данных из файла спецификации."""
+    all_sheets = pd.read_excel(spec_file, sheet_name=None)  # Загружаем все листы
+    specification = pd.concat(all_sheets.values(), ignore_index=True)  # Объединяем в один DataFrame
+    return specification
 
 def prepare_data(specification, passports):
     """Очистка и подготовка данных."""
@@ -61,6 +68,7 @@ def merge_data(specification, passports):
 
 def create_result_table(merged_data):
     """Создание результирующей таблицы с пустыми столбцами и нумерацией."""
+    
     result = pd.DataFrame({
         'A': merged_data['Поз.']-1,
         'B': '',
@@ -72,6 +80,7 @@ def create_result_table(merged_data):
         'H': merged_data['H'],
         'I': merged_data['I']
     })
+    result = result.drop_duplicates(subset=['C'], keep='first')
     # result.insert(0, '№', range(1, len(result) + 1))
     return result
 
@@ -90,7 +99,7 @@ def add_section_names(result, specification):
             current_line = ""
 
             for word in words:
-                if len(current_line) + len(word) + 1 <= 18:  # +1 для пробела
+                if len(current_line) + len(word) + 1 <= 20:  # +1 для пробела
                     current_line += (" " if current_line else "") + word
                 else:
                     lines.append(current_line)
@@ -122,14 +131,24 @@ def save_to_excel(final_data, output_path):
 
     italic_sections = [
         "Конденсаторы", "Микросхемы", "Катушки", "индуктивности", "Резисторы",
-        "Печатная плата", "Транзисторы", "Диоды", "Соединения", "контактные"
+        "Печатная плата", "Транзисторы", "Диоды", "Соединения", "контактные",
+        "Джамперы"
     ]
 
     for row in final_data:
-        if row_count >= 18:
+        if row_count >= 17:
             sheet_number += 1
-            ws = wb.create_sheet(title=f"Лист{sheet_number}")
             row_count = 0
+            # for cel in row:
+                # if cel in italic_sections:
+            ws = wb.create_sheet(title=f"Лист{sheet_number}")
+                    # row_count = 0
+            break
+                # else:
+                #     if row_count == 18:
+                #         ws = wb.create_sheet(title=f"Лист{sheet_number}")
+                #         row_count = 0
+                #         break
 
         ws.append(row)
         row_count += 1
@@ -382,7 +401,7 @@ def main():
 
 def filter_unwanted_sections(specification):
     """Фильтрация ненужных разделов."""
-    unwanted_sections = ["Документация", "Сборочный чертеж", "Сборочные единицы", "Плата печатная", "Прочие изделия", "Джамперы", "Оловянная перемычка"]
+    unwanted_sections = ["Документация", "Сборочный чертеж", "Сборочные единицы", "Плата печатная", "Прочие изделия", "Джамперы", "Оловянная перемычка", "Джампер"]
 
     # Убираем пробелы и приводим к нижнему регистру для точности сравнения
     specification['Наименование'] = specification['Наименование'].str.strip()
@@ -394,7 +413,7 @@ def filter_unwanted_sections(specification):
 
 def filter_unwanted_sections_MK(specification):
     """Фильтрация ненужных разделов."""
-    unwanted_sections = ["Документация", "Сборочный чертеж", "Прочие изделия", "Джамперы", "Оловянная перемычка"]
+    unwanted_sections = ["Документация", "Сборочный чертеж", "Прочие изделия", "Джамперы", "Оловянная перемычка", "Джампер"]
 
     # Убираем пробелы и приводим к нижнему регистру для точности сравнения
     specification['Наименование'] = specification['Наименование'].str.strip()

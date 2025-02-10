@@ -4,9 +4,10 @@ import subprocess
 import copy
 import yaml
 from pathlib import Path
-from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QFileDialog, QLabel, QMessageBox
+from PyQt6.QtWidgets import QApplication, QWidget, QCheckBox, QVBoxLayout, QPushButton, QFileDialog, QLabel, QMessageBox, QHBoxLayout
 from backend import load_data, prepare_data, merge_data, create_result_table, \
-add_section_names, save_to_excel, filter_unwanted_sections, MK_creator, filter_unwanted_sections_MK
+add_section_names, save_to_excel, filter_unwanted_sections, MK_creator, filter_unwanted_sections_MK,\
+load_specification
 
 class FileSelectionWindow(QWidget):
     def __init__(self):
@@ -54,21 +55,48 @@ class FileSelectionWindow(QWidget):
 
         self.process_button = QPushButton("Обработать данные")
         self.process_button.clicked.connect(self.process_data)
+        self.process_button.setEnabled(True)  # Изначально кнопка неактивна
+
+        # Чекбоксы "МП" и "МК"
+        self.mp_checkbox = QCheckBox("МП")
+        self.mp_checkbox.setChecked(True)
+        self.mk_checkbox = QCheckBox("МК")
+        self.mk_checkbox.setChecked(True)
+
+        # Подключаем чекбоксы к функции обновления состояния кнопки
+        self.mp_checkbox.stateChanged.connect(self.update_process_button_state)
+        self.mk_checkbox.stateChanged.connect(self.update_process_button_state)
 
         # Метки для отображения путей
         self.spec_label = QLabel("Спецификация: Не выбрано")
         self.ekb_label = QLabel("ЭКБ: Не выбрано")
 
-        # Размещение элементов
+        # Компоновка: кнопки + чекбоксы в одной строке
+        spec_layout = QHBoxLayout()
+        spec_layout.addWidget(self.select_spec_button)
+        spec_layout.addWidget(self.mp_checkbox)
+
+        ekb_layout = QHBoxLayout()
+        ekb_layout.addWidget(self.select_ekb_button)
+        ekb_layout.addWidget(self.mk_checkbox)
+
+        # Основной layout
         layout = QVBoxLayout()
-        layout.addWidget(self.select_spec_button)
+        layout.addLayout(spec_layout)
         layout.addWidget(self.spec_label)
-        layout.addWidget(self.select_ekb_button)
+        layout.addLayout(ekb_layout)
         layout.addWidget(self.ekb_label)
         layout.addWidget(self.process_button)
 
         self.setLayout(layout)
         self.load_from_config()
+
+    def update_process_button_state(self):
+        """Обновление состояния кнопки в зависимости от чекбоксов."""
+        if self.mp_checkbox.isChecked() or self.mk_checkbox.isChecked():
+            self.process_button.setEnabled(True)
+        else:
+            self.process_button.setEnabled(False)
 
     def select_spec_file(self):
         """Выбор файла спецификации."""
@@ -80,40 +108,48 @@ class FileSelectionWindow(QWidget):
     def select_ekb_file(self):
         """Выбор файла ЭКБ."""
         file_dialog = QFileDialog(self)
-        self.ekb_file, _ = file_dialog.getOpenFileName(self, "Выберите файл ЭКБ", str(Path().joinpath(self.ekb_path)), "Excel Files (*.xlsx)")
+        self.ekb_file, _ = file_dialog.getOpenFileName(self, "Выберите файл перечня ЭКБ", str(Path().joinpath(self.ekb_path)), "Excel Files (*.xlsx)")
         if self.ekb_file:
             self.ekb_label.setText(f"ЭКБ: {self.ekb_file}")
 
     def process_data(self):
         """Обработка данных и создание выходного файла."""
-        if self.spec_file and self.ekb_file:
+        if self.spec_file:
             self.spec_path = self.spec_file
+            self.save_to_config()
+        elif self.ekb_path:
             self.ekb_path = self.ekb_file
             self.save_to_config()
-        if not self.spec_file or not self.ekb_file:
-            self.spec_label.setText("Пожалуйста, выберите оба файла")
-            return
-
-        specification, passports = load_data(self.spec_file, self.ekb_file)
-        specification, passports = prepare_data(specification, passports)
-        specification_MK = copy.deepcopy(specification)
-        specification_MK = filter_unwanted_sections_MK(specification_MK)
-        specification = filter_unwanted_sections(specification)
-        merged_data = merge_data(specification, passports)
-        result = create_result_table(merged_data)
-        final_data = add_section_names(result, specification)
+        if not self.spec_file:
+            self.spec_label.setText("Пожалуйста, выберите файл спецификации")
+        if not self.ekb_file:
+            if self.mp_checkbox.isChecked():
+                self.spec_label.setText("Пожалуйста, выберите файл перечня ЭКБ")
+                return
 
         # Путь для сохранения выходного файла
         self.output_path = Path(self.spec_file).parent/"merged_output_MP.xlsx"
         MK_creator_path = Path(self.spec_file).parent/"grouped_book_MK.xlsx"
-        save_to_excel(final_data, self.output_path)
-        MK_creator(self.spec_file, specification_MK, MK_creator_path, specification)
-        # Отображаем путь к сохраненному файлу
-        self.spec_label.setText(f"Файл сохранен: {self.output_path}")
 
-        # Открытие выходного файла
-        self.open_file(self.output_path)
-        self.open_file(MK_creator_path)
+        if self.mp_checkbox.isChecked():
+            specification, passports = load_data(self.spec_file, self.ekb_file)
+            specification, passports = prepare_data(specification, passports)
+            specification = filter_unwanted_sections(specification) 
+            merged_data = merge_data(specification, passports)
+            result = create_result_table(merged_data)
+            final_data = add_section_names(result, specification)
+            save_to_excel(final_data, self.output_path)
+            # Отображаем путь к сохраненному файлу
+            self.spec_label.setText(f"Файл сохранен: {self.output_path}")
+            self.open_file(self.output_path)
+        if self.mk_checkbox.isChecked():
+            if not self.mp_checkbox.isChecked():
+                specification = load_specification(self.spec_file)
+            specification_MK = copy.deepcopy(specification)
+            specification_MK = filter_unwanted_sections_MK(specification_MK)
+            MK_creator(self.spec_file, specification_MK, MK_creator_path, specification)
+            # Открытие выходного файла
+            self.open_file(MK_creator_path)
 
 
     def open_file(self, file_path):
