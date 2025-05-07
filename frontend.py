@@ -4,7 +4,8 @@ import subprocess
 import copy
 import yaml
 from pathlib import Path
-from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QFileDialog, QLabel, QMessageBox
+from PyQt6.QtWidgets import (QApplication, QWidget, QVBoxLayout, QHBoxLayout, 
+                             QPushButton, QFileDialog, QLabel, QMessageBox, QCheckBox)
 from backend import load_data, prepare_data, merge_data, create_result_table, \
 add_section_names, save_to_excel, filter_unwanted_sections, MK_creator, filter_unwanted_sections_MK
 
@@ -15,8 +16,8 @@ class FileSelectionWindow(QWidget):
         self.spec_file = ''
         self.ekb_file = ''
         self.output_path = ''
-        self.spec_path:str = ""
-        self.ekb_path:str = ""
+        self.spec_path: str = ""
+        self.ekb_path: str = ""
         self.init_ui()
 
     def save_to_config(self) -> None:
@@ -55,6 +56,19 @@ class FileSelectionWindow(QWidget):
         self.process_button = QPushButton("Обработать данные")
         self.process_button.clicked.connect(self.process_data)
 
+        # Чекбоксы для выбора типа выходных файлов
+        self.mp_checkbox = QCheckBox("output_MP")
+        self.mp_checkbox.setChecked(True)  # По умолчанию выбран
+        self.mk_checkbox = QCheckBox("output_MK")
+        self.mk_checkbox.setChecked(True)  # По умолчанию выбран
+
+        # Горизонтальный layout для чекбоксов и кнопки обработки
+        process_layout = QHBoxLayout()
+        process_layout.addWidget(self.mp_checkbox)
+        process_layout.addWidget(self.mk_checkbox)
+        process_layout.addStretch()  # Добавляем растягиваемое пространство
+        process_layout.addWidget(self.process_button)
+
         # Метки для отображения путей
         self.spec_label = QLabel("Спецификация: Не выбрано!")
         self.ekb_label = QLabel("Перечень ЭКБ: Не выбрано!")
@@ -65,7 +79,7 @@ class FileSelectionWindow(QWidget):
         layout.addWidget(self.spec_label)
         layout.addWidget(self.select_ekb_button)
         layout.addWidget(self.ekb_label)
-        layout.addWidget(self.process_button)
+        layout.addLayout(process_layout)  # Добавляем горизонтальный layout вместо кнопки
 
         self.setLayout(layout)
         self.load_from_config()
@@ -93,29 +107,41 @@ class FileSelectionWindow(QWidget):
         if not self.spec_file or not self.ekb_file:
             self.spec_label.setText("Пожалуйста, выберите оба файла")
             return
+        
+        try:
+            specification, passports = load_data(self.spec_file, self.ekb_file)
+            specification, passports = prepare_data(specification, passports)
+        except Exception:
+            self.spec_label.setText("Ошибка данных")
+            self.ekb_label.setText("Ошибка данных")
+        
+        # Создаем папку output, если ее нет
+        try:
+            os.mkdir(Path(self.spec_file).parent/"output")
+        except Exception:
+            pass
 
-        specification, passports = load_data(self.spec_file, self.ekb_file)
-        specification, passports = prepare_data(specification, passports)
-        specification_MK = copy.deepcopy(specification)
-        specification_MK = filter_unwanted_sections_MK(specification_MK)
-        specification = filter_unwanted_sections(specification)
-        merged_data = merge_data(specification, passports)
-        result = create_result_table(merged_data)
-        final_data = add_section_names(result, specification)
+        # Обработка для output_MP, если выбран соответствующий чекбокс
+        if self.mp_checkbox.isChecked():
+            specification_mp = copy.deepcopy(specification)
+            specification_mp = filter_unwanted_sections(specification_mp)
+            merged_data = merge_data(specification_mp, passports)
+            result = create_result_table(merged_data)
+            final_data = add_section_names(result, specification_mp)
+            
+            self.output_path = Path(self.spec_file).parent/"output/output_MP.xlsx"
+            save_to_excel(final_data, self.output_path)
+            self.spec_label.setText(f"Файл сохранен: {self.output_path}")
+            self.open_file(self.output_path)
 
-        # Путь для сохранения выходного файла
-        self.output_path = Path(self.spec_file).parent/"merged_output_MP.xlsx"
-        MK_creator_path = Path(self.spec_file).parent/"merged_output_MK.xlsx"
-        save_to_excel(final_data, self.output_path)
-        MK_creator(self.spec_file, specification_MK, MK_creator_path, specification)
-        # Отображаем путь к сохраненному файлу
-        self.spec_label.setText(f"Файл сохранен: {self.output_path}")
-
-        # Открытие выходного файла
-        self.open_file(self.output_path)
-        self.open_file(MK_creator_path)
-
-
+        # Обработка для output_MK, если выбран соответствующий чекбокс
+        if self.mk_checkbox.isChecked():
+            specification_mk = copy.deepcopy(specification)
+            specification_mk = filter_unwanted_sections_MK(specification_mk)
+            MK_creator_path = Path(self.spec_file).parent/"output/output_MK.xlsx"
+            MK_creator(self.spec_file, specification_mk, MK_creator_path, specification)
+            self.open_file(MK_creator_path)
+        
     def open_file(self, file_path):
         """Открытие выходного файла в системе."""
         if sys.platform == 'win32':  # Для Windows

@@ -30,9 +30,37 @@ def prepare_data(specification, passports):
 
     # Преобразуем дату в строку (если она не строка)
     passports['Дата'] = passports['Дата'].astype(str)
+    passports['Дата'] = fix_date_format(passports['Дата'])
+
 
     return specification, passports
 
+def fix_date_format(date_series):
+    """
+    Приводит даты в формате 'M.YYYY' или 'M.YY' к единому формату 'MM.YYYY'
+    Примеры:
+    '5.2021' -> '05.2021'
+    '1.202' -> '01.2020'
+    '12.202' -> '12.2020'
+    """
+    def process_date(date_str):
+        if pd.isna(date_str):
+            return date_str
+        
+        # Если значение уже является строкой в нужном формате, пропускаем
+        if isinstance(date_str, str) and len(date_str.split('.')) == 2:
+            month, year = date_str.split('.')
+            
+            # Добавляем ведущий ноль к месяцу, если нужно
+            month = month.zfill(2)
+            
+            # Исправляем год (добавляем 0 если год трехзначный)
+            year = year.ljust(4, '0') if len(year) == 3 else year
+            
+            return f"{month}.{year}"
+        return date_str
+    
+    return date_series.apply(process_date)
 
 def extract_year_and_add_25(date_str):
     """Извлекает год из строки формата 'MM.YYYY' и прибавляет 25."""
