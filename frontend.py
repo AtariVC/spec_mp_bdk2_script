@@ -49,15 +49,15 @@ class FileSelectionWindow(QWidget):
         self.select_spec_button = QPushButton("Выбрать файл спецификации")
         self.select_spec_button.clicked.connect(self.select_spec_file)
 
-        self.select_ekb_button = QPushButton("Выбрать файл ЭКБ")
+        self.select_ekb_button = QPushButton("Выбрать файл перечня ЭКБ")
         self.select_ekb_button.clicked.connect(self.select_ekb_file)
 
         self.process_button = QPushButton("Обработать данные")
         self.process_button.clicked.connect(self.process_data)
 
         # Метки для отображения путей
-        self.spec_label = QLabel("Спецификация: Не выбрано")
-        self.ekb_label = QLabel("ЭКБ: Не выбрано")
+        self.spec_label = QLabel("Спецификация: Не выбрано!")
+        self.ekb_label = QLabel("Перечень ЭКБ: Не выбрано!")
 
         # Размещение элементов
         layout = QVBoxLayout()
@@ -80,7 +80,7 @@ class FileSelectionWindow(QWidget):
     def select_ekb_file(self):
         """Выбор файла ЭКБ."""
         file_dialog = QFileDialog(self)
-        self.ekb_file, _ = file_dialog.getOpenFileName(self, "Выберите файл ЭКБ", str(Path().joinpath(self.ekb_path)), "Excel Files (*.xlsx)")
+        self.ekb_file, _ = file_dialog.getOpenFileName(self, "Выберите файл перечня ЭКБ", str(Path().joinpath(self.ekb_path)), "Excel Files (*.xlsx)")
         if self.ekb_file:
             self.ekb_label.setText(f"ЭКБ: {self.ekb_file}")
 
@@ -105,7 +105,7 @@ class FileSelectionWindow(QWidget):
 
         # Путь для сохранения выходного файла
         self.output_path = Path(self.spec_file).parent/"merged_output_MP.xlsx"
-        MK_creator_path = Path(self.spec_file).parent/"grouped_book_MK.xlsx"
+        MK_creator_path = Path(self.spec_file).parent/"merged_output_MK.xlsx"
         save_to_excel(final_data, self.output_path)
         MK_creator(self.spec_file, specification_MK, MK_creator_path, specification)
         # Отображаем путь к сохраненному файлу
